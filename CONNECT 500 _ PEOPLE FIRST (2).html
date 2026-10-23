@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CONNECT 500 | PEOPLE FIRST</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  tailwind.config = { theme: { extend: { colors: { grab: { DEFAULT: '#00B14F', dark: '#008744' } } } } }
+</script>
+<style>
+  [x-cloak] { display: none !important; }
+  :root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  body { background: #d1d5db; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  input[type=range] { accent-color: #00B14F; }
+</style>
+<script>
+function connect() {
+  return {
+    tab: 'home',
+    toast: '',
+    formError: '',
+    criteria: ['Continuity', 'Crossing', 'Universal Access', 'Comfort', 'Wayfinding'],
+    statuses: ['Logged', 'Under Review', 'Action Assigned', 'Resolved/Re-audited'],
+    navs: [
+      { id: 'home', icon: '🏠', label: 'Home' },
+      { id: 'audit', icon: '🚶', label: 'Route Audit' },
+      { id: 'report', icon: '📸', label: 'Report' },
+      { id: 'tracker', icon: '📊', label: 'Tracker' }
+    ],
+    categories: [
+      { name: 'Unsafe Crossing', icon: '🚸', bg: 'bg-red-100' },
+      { name: 'Missing Kerb/Ramp', icon: '♿', bg: 'bg-blue-100' },
+      { name: 'Path Obstruction', icon: '🚧', bg: 'bg-amber-100' },
+      { name: 'Heat/Shade', icon: '☀️', bg: 'bg-orange-100' },
+      { name: 'Wayfinding', icon: '🧭', bg: 'bg-purple-100' }
+    ],
+    owners: [
+      { key: 'SDP', label: 'SDP Town Mgmt' },
+      { key: 'MBDK', label: 'MBDK Local Council' },
+      { key: 'TNB', label: 'TNB (Utility)' }
+    ],
+    priorities: ['Low', 'Medium', 'High'],
+    samples: ['Kerb photo.jpg', 'Crossing photo.jpg', 'Shade gap photo.jpg'],
+    segments: [
+      { id: 'A01', name: 'Path Arrival', desc: 'Residential edge to corridor entry', s: [6, 7, 5, 6, 4] },
+      { id: 'A02', name: 'Unsafe Crossing', desc: 'Junction crossing near the BBR2 gate', s: [7, 2, 4, 5, 5] },
+      { id: 'A03', name: 'Shade Gap', desc: 'Open stretch with no tree cover', s: [8, 7, 7, 2, 6] },
+      { id: 'A04', name: 'Park Entrance', desc: 'Wetland Townpark gateway', s: [8, 8, 6, 7, 8] }
+    ],
+    tickets: [
+      { id: 'C5-001', seg: 'A02', cat: 'Unsafe Crossing', priority: 'High', owner: 'MBDK', status: 2, date: '08 Oct', note: 'No pedestrian refuge island. Vehicles turn at speed and strollers wait in the lane.' },
+      { id: 'C5-002', seg: 'A03', cat: 'Heat/Shade', priority: 'Medium', owner: 'SDP', status: 1, date: '12 Oct', note: 'Roughly 120m with no tree cover. Walkers stop midway in afternoon heat.' },
+      { id: 'C5-003', seg: 'A01', cat: 'Missing Kerb/Ramp', priority: 'High', owner: 'SDP', status: 3, date: '02 Oct', note: 'Dropped kerb missing at the arrival point. Wheelchair users must use the road edge.' },
+      { id: 'C5-004', seg: 'A04', cat: 'Wayfinding', priority: 'Low', owner: 'SDP', status: 0, date: '19 Oct', note: 'No signage from the park gate pointing back toward the residential edge.' }
+    ],
+    form: { seg: 'A02', cat: 'Unsafe Crossing', priority: 'High', owner: 'MBDK', note: '', evidence: '' },
+
+    segScore(seg) { return +(seg.s.reduce((a, b) => a + b, 0) / seg.s.length).toFixed(1); },
+    routeScore() { return +(this.segments.reduce((a, s) => a + this.segScore(s), 0) / this.segments.length).toFixed(1); },
+    weakest() { return this.segments.reduce((m, s) => this.segScore(s) < this.segScore(m) ? s : m); },
+    col(n) { return n >= 7 ? '#00B14F' : n >= 5 ? '#F59E0B' : '#EF4444'; },
+    ownerLabel(k) { return this.owners.find(o => o.key === k)?.label || k; },
+    statusColor(i) { return ['bg-gray-500', 'bg-blue-500', 'bg-amber-500', 'bg-grab'][i]; },
+    openCount() { return this.tickets.filter(t => t.status < 3).length; },
+    resolvedCount() { return this.tickets.filter(t => t.status === 3).length; },
+    segName(id) { return this.segments.find(s => s.id === id)?.name || id; },
+    flash(msg) {
+      this.toast = msg;
+      setTimeout(() => { this.toast = ''; }, 2400);
+    },
+    advance(t) {
+      if (t.status < 3) {
+        t.status++;
+        this.flash(t.id + ' moved to ' + this.statuses[t.status]);
+      }
+    },
+    submitReport() {
+      if (this.form.note.trim().length < 10) {
+        this.formError = 'Please describe the barrier (at least 10 characters).';
+        return;
+      }
+      this.formError = '';
+      const owner = this.ownerLabel(this.form.owner);
+      const n = this.tickets.length + 1;
+      this.tickets.unshift({
+        id: 'C5-' + String(n).padStart(3, '0'),
+        seg: this.form.seg,
+        cat: this.form.cat,
+        priority: this.form.priority,
+        owner: this.form.owner,
+        note: this.form.note.trim(),
+        date: 'Today',
+        status: 0
+      });
+      this.form.note = '';
+      this.form.evidence = '';
+      this.tab = 'tracker';
+      this.$refs.main.scrollTop = 0;
+      this.flash('Ticket logged and routed to ' + owner);
+    }
+  };
+}
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+</head>
+<body class="min-h-screen font-sans text-gray-900" x-data="connect()" x-cloak>
+<div class="min-h-screen md:flex md:items-center md:justify-center md:p-6">
+  <div class="relative w-full md:max-w-[400px] h-[100dvh] md:h-[820px] bg-gray-50 md:rounded-[2.5rem] md:border-[10px] md:border-gray-900 shadow-2xl overflow-hidden flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-gradient-to-br from-grab to-grab-dark text-white px-5 pt-5 pb-12 rounded-b-[2rem]">
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <p class="text-[11px] tracking-widest opacity-90">CONNECT 500 | PEOPLE FIRST</p>
+          <p class="text-lg font-bold mt-0.5">Hi, Auditor 👋</p>
+        </div>
+        <span class="bg-white/20 text-[11px] px-3 py-1 rounded-full whitespace-nowrap">📍 Bandar Bukit Raja 2</span>
+      </div>
+    </header>
+
+    <!-- Announcement banner -->
+    <div class="-mt-8 mx-4 bg-white rounded-2xl shadow-md p-3 flex items-center gap-3 relative z-10">
+      <span class="text-2xl">📣</span>
+      <p class="text-xs font-semibold leading-snug">12-Week Pilot: Co-Auditing 500m Corridor to Wetland Townpark</p>
+    </div>
+
+    <!-- Scrollable content -->
+    <main x-ref="main" class="flex-1 overflow-y-auto no-scrollbar pb-28 pt-4">
+
+      <!-- HOME -->
+      <section x-show="tab === 'home'" class="px-4 space-y-4">
+
+        <!-- Action grid -->
+        <div class="grid grid-cols-4 gap-2 bg-white rounded-2xl p-3 shadow-sm">
+          <button @click="tab = 'audit'" class="flex flex-col items-center gap-1 rounded-xl p-1 hover:bg-gray-50">
+            <span class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-2xl">🚶</span>
+            <span class="text-[10px] text-center font-medium leading-tight">Audit 500m Route</span>
+          </button>
+          <button @click="tab = 'report'" class="flex flex-col items-center gap-1 rounded-xl p-1 hover:bg-gray-50">
+            <span class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-2xl">📸</span>
+            <span class="text-[10px] text-center font-medium leading-tight">Report Barrier</span>
+          </button>
+          <button @click="tab = 'tracker'" class="flex flex-col items-center gap-1 rounded-xl p-1 hover:bg-gray-50">
+            <span class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-2xl">📊</span>
+            <span class="text-[10px] text-center font-medium leading-tight">Action Board / Tickets</span>
+          </button>
+          <button @click="tab = 'home'; $nextTick(() => document.getElementById('map')?.scrollIntoView({ behavior: 'smooth' }))" class="flex flex-col items-center gap-1 rounded-xl p-1 hover:bg-gray-50">
+            <span class="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-2xl">🗺️</span>
+            <span class="text-[10px] text-center font-medium leading-tight">Townpark Trail Map</span>
+          </button>
+        </div>
+
+        <!-- Stats with progress badges -->
+        <div class="grid grid-cols-3 gap-2">
+          <div class="bg-white rounded-2xl p-3 shadow-sm text-center">
+            <p class="text-[10px] text-gray-500">RouteReady</p>
+            <p class="text-xl font-bold" :style="'color:' + col(routeScore())" x-text="routeScore() + '/10'"></p>
+          </div>
+          <div class="bg-white rounded-2xl p-3 shadow-sm text-center">
+            <p class="text-[10px] text-gray-500">Open issues</p>
+            <p class="text-xl font-bold text-amber-600" x-text="openCount()"></p>
+          </div>
+          <div class="bg-white rounded-2xl p-3 shadow-sm text-center">
+            <p class="text-[10px] text-gray-500">Resolved</p>
+            <p class="text-xl font-bold text-grab-dark" x-text="resolvedCount()"></p>
+          </div>
+        </div>
+
+        <!-- Route card -->
+        <button @click="tab = 'audit'" class="w-full text-left bg-white rounded-2xl p-4 shadow-sm space-y-3">
+          <div class="flex justify-between items-center">
+            <p class="font-bold">BBR2 to Wetland Townpark</p>
+            <span class="text-[10px] bg-green-100 text-grab-dark px-2 py-1 rounded-full font-semibold">~500 m · 4 segments</span>
+          </div>
+          <svg viewBox="0 0 340 110" class="w-full h-24 rounded-xl bg-green-50">
+            <path d="M20 50 H320" stroke="#e5e7eb" stroke-width="14" stroke-linecap="round"/>
+            <line x1="20" y1="50" x2="95" y2="50" :stroke="col(segScore(segments[0]))" stroke-width="8" stroke-linecap="round"/>
+            <line x1="95" y1="50" x2="170" y2="50" :stroke="col(segScore(segments[1]))" stroke-width="8" stroke-linecap="round"/>
+            <line x1="170" y1="50" x2="245" y2="50" :stroke="col(segScore(segments[2]))" stroke-width="8" stroke-linecap="round"/>
+            <line x1="245" y1="50" x2="320" y2="50" :stroke="col(segScore(segments[3]))" stroke-width="8" stroke-linecap="round"/>
+            <circle cx="20" cy="50" r="8" fill="#1f2937"/>
+            <circle cx="320" cy="50" r="8" fill="#00B14F"/>
+            <text x="57" y="34" font-size="10" text-anchor="middle" fill="#374151">A01</text>
+            <text x="132" y="34" font-size="10" text-anchor="middle" fill="#374151">A02</text>
+            <text x="207" y="34" font-size="10" text-anchor="middle" fill="#374151">A03</text>
+            <text x="282" y="34" font-size="10" text-anchor="middle" fill="#374151">A04</text>
+            <text x="20" y="80" font-size="10" text-anchor="middle" fill="#374151">BBR2</text>
+            <text x="320" y="80" font-size="10" text-anchor="middle" fill="#374151">Townpark</text>
+          </svg>
+          <p class="text-xs text-grab-dark font-semibold">Start a walkability audit →</p>
+        </button>
+
+        <!-- Townpark map -->
+        <div id="map" class="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+          <p class="font-bold">🗺️ Wetland Townpark Trail Map</p>
+          <svg viewBox="0 0 340 150" class="w-full h-36 rounded-xl bg-gradient-to-b from-sky-100 to-green-100">
+            <rect x="240" y="20" width="90" height="70" rx="12" fill="#86efac" opacity="0.8"/>
+            <text x="285" y="60" font-size="10" text-anchor="middle" fill="#14532d">Wetland</text>
+            <rect x="20" y="30" width="80" height="50" rx="8" fill="#e5e7eb"/>
+            <text x="60" y="60" font-size="10" text-anchor="middle" fill="#374151">BBR2</text>
+            <path d="M100 55 C150 20, 190 90, 240 55" stroke="#00B14F" stroke-width="4" fill="none" stroke-dasharray="6 4"/>
+            <circle cx="150" cy="40" r="6" :fill="col(segScore(segments[1]))"/>
+            <circle cx="190" cy="78" r="6" :fill="col(segScore(segments[2]))"/>
+            <text x="170" y="140" font-size="9" text-anchor="middle" fill="#374151">Dashed line = 500 m corridor</text>
+          </svg>
+          <div class="flex gap-2 text-[10px]">
+            <span class="px-2 py-1 rounded-full bg-green-100 text-grab-dark">Score 7+ good</span>
+            <span class="px-2 py-1 rounded-full bg-amber-100 text-amber-700">5 to 6.9 fair</span>
+            <span class="px-2 py-1 rounded-full bg-red-100 text-red-700">Below 5 weak</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ROUTE AUDIT -->
+      <section x-show="tab === 'audit'" class="px-4 space-y-4">
+        <div class="bg-white rounded-2xl p-4 shadow-sm flex items-center gap-4">
+          <div class="w-20 h-20 shrink-0 rounded-full border-[6px] flex flex-col items-center justify-center" :style="'border-color:' + col(routeScore())">
+            <p class="text-xl font-bold" x-text="routeScore()"></p>
+            <p class="text-[9px] text-gray-500">of 10</p>
+          </div>
+          <div>
+            <p class="font-bold">RouteReady Index</p>
+            <p class="text-xs text-gray-500">Average of 4 segments, each scored on 5 criteria. Drag the sliders to re-audit.</p>
+          </div>
+        </div>
+
+        <div x-show="segScore(weakest()) < 5" class="bg-red-50 border border-red-200 rounded-2xl p-3">
+          <p class="font-bold text-red-700 text-sm">⚠️ Weakest link: <span x-text="weakest().id + ' ' + weakest().name"></span></p>
+          <p class="text-xs text-red-600 mt-1">This one segment sets the usability of the whole trip. Fix it first and re-audit.</p>
+        </div>
+
+        <template x-for="seg in segments" :key="seg.id">
+          <div class="bg-white rounded-2xl p-4 shadow-sm" :class="(seg.id === weakest().id && segScore(seg) < 5) ? 'ring-2 ring-red-400' : ''">
+            <div class="flex justify-between items-start gap-2">
+              <div>
+                <p class="text-[11px] text-gray-500" x-text="'Seg ' + seg.id"></p>
+                <p class="font-bold" x-text="seg.name"></p>
+                <p class="text-xs text-gray-500" x-text="seg.desc"></p>
+              </div>
+              <span class="px-3 py-1 rounded-full text-white text-sm font-bold whitespace-nowrap" :style="'background:' + col(segScore(seg))" x-text="segScore(seg) + '/10'"></span>
+            </div>
+            <div class="mt-3 space-y-2">
+              <template x-for="(c, i) in criteria" :key="seg.id + c">
+                <div>
+                  <div class="flex justify-between text-xs">
+                    <span x-text="c"></span>
+                    <span class="font-semibold" x-text="seg.s[i]"></span>
+                  </div>
+                  <input type="range" min="0" max="10" x-model.number="seg.s[i]" class="w-full h-1">
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- REPORT -->
+      <section x-show="tab === 'report'" class="px-4 space-y-4">
+        <div>
+          <p class="text-lg font-bold">Report a Barrier</p>
+          <p class="text-xs text-gray-500">Logged issues are routed to the asset owner for verification.</p>
+        </div>
+
+        <form @submit.prevent="submitReport()" class="bg-white rounded-2xl p-4 shadow-sm space-y-4">
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Segment ID</label>
+            <select x-model="form.seg" class="w-full mt-1 border border-gray-200 rounded-xl p-2 text-sm bg-white">
+              <option value="A01">Seg A01: Path Arrival</option>
+              <option value="A02">Seg A02: Unsafe Crossing</option>
+              <option value="A03">Seg A03: Shade Gap</option>
+              <option value="A04">Seg A04: Park Entrance</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Barrier category</label>
+            <div class="grid grid-cols-2 gap-2 mt-1">
+              <template x-for="cat in categories" :key="cat.name">
+                <button type="button" @click="form.cat = cat.name" class="flex items-center gap-2 p-2 rounded-xl border-2 text-left" :class="form.cat === cat.name ? 'border-grab bg-green-50' : 'border-gray-200'">
+                  <span class="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-lg" :class="cat.bg" x-text="cat.icon"></span>
+                  <span class="text-[11px] font-semibold leading-tight" x-text="cat.name"></span>
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Priority</label>
+            <div class="grid grid-cols-3 gap-2 mt-1">
+              <template x-for="p in priorities" :key="p">
+                <button type="button" @click="form.priority = p" class="py-2 rounded-xl text-xs font-semibold border-2" :class="form.priority === p ? 'border-grab bg-grab text-white' : 'border-gray-200 text-gray-600'" x-text="p"></button>
+              </template>
+            </div>
+          </div>
+
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Suspected owner</label>
+            <div class="grid grid-cols-1 gap-2 mt-1">
+              <template x-for="o in owners" :key="o.key">
+                <button type="button" @click="form.owner = o.key" class="py-2 px-3 rounded-xl text-xs font-semibold border-2 text-left" :class="form.owner === o.key ? 'border-blue-500 bg-blue-50 text-blue-800' : 'border-gray-200 text-gray-600'" x-text="o.label"></button>
+              </template>
+            </div>
+          </div>
+
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Visual evidence</label>
+            <label class="mt-1 block border-2 border-dashed border-gray-300 rounded-xl p-3 text-center text-xs text-gray-500 cursor-pointer">
+              📷 <span x-text="form.evidence || 'Upload a photo (optional)'"></span>
+              <input type="file" accept="image/*" class="hidden" @change="form.evidence = $event.target.files[0]?.name || ''">
+            </label>
+            <div class="flex gap-2 overflow-x-auto no-scrollbar mt-2">
+              <template x-for="s in samples" :key="s">
+                <button type="button" @click="form.evidence = s" class="shrink-0 text-[11px] px-3 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200" x-text="s"></button>
+              </template>
+            </div>
+          </div>
+
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Describe the barrier</label>
+            <textarea x-model="form.note" rows="3" placeholder="e.g. Dropped kerb missing at the junction" class="w-full mt-1 border border-gray-200 rounded-xl p-2 text-sm"></textarea>
+            <p x-show="formError" class="text-xs text-red-600 mt-1" x-text="formError"></p>
+          </div>
+
+          <button type="submit" class="w-full bg-grab hover:bg-grab-dark text-white font-bold rounded-xl py-3">Submit Report</button>
+        </form>
+      </section>
+
+      <!-- TRACKER -->
+      <section x-show="tab === 'tracker'" class="px-4 space-y-4">
+        <div class="flex items-end justify-between">
+          <div>
+            <p class="text-lg font-bold">Live Ticket Tracker</p>
+            <p class="text-xs text-gray-500">Logged, Under Review, Action Assigned, Resolved/Re-audited</p>
+          </div>
+        </div>
+
+        <template x-for="t in tickets" :key="t.id">
+          <div class="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+            <div class="flex justify-between items-start gap-2">
+              <div>
+                <p class="text-[11px] text-gray-500" x-text="t.id + ' · ' + segName(t.seg) + ' · ' + t.date"></p>
+                <p class="font-bold" x-text="t.cat"></p>
+              </div>
+              <span class="text-[10px] px-2 py-1 rounded-full font-bold text-white whitespace-nowrap" :class="statusColor(t.status)" x-text="statuses[t.status]"></span>
+            </div>
+            <p class="text-xs text-gray-600" x-text="t.note"></p>
+            <div class="flex flex-wrap gap-2 text-[11px]">
+              <span class="px-2 py-1 rounded-full bg-gray-100" x-text="'Priority: ' + t.priority"></span>
+              <span class="px-2 py-1 rounded-full bg-blue-100 text-blue-800 font-semibold" x-text="'Owner: ' + ownerLabel(t.owner)"></span>
+            </div>
+            <div class="grid grid-cols-4 gap-1">
+              <template x-for="(st, i) in statuses" :key="st">
+                <div>
+                  <div class="h-1.5 rounded-full" :class="i <= t.status ? 'bg-grab' : 'bg-gray-200'"></div>
+                  <p class="text-[9px] mt-1 text-center leading-tight" :class="i <= t.status ? 'text-gray-800 font-semibold' : 'text-gray-400'" x-text="st"></p>
+                </div>
+              </template>
+            </div>
+            <button x-show="t.status < 3" @click="advance(t)" class="w-full bg-grab hover:bg-grab-dark text-white rounded-xl py-2 text-sm font-semibold" x-text="'Move to: ' + statuses[t.status + 1]"></button>
+            <p x-show="t.status === 3" class="text-center text-sm text-grab-dark font-semibold">✅ Closed and re-audited</p>
+          </div>
+        </template>
+      </section>
+
+    </main>
+
+    <!-- Toast -->
+    <div x-show="toast" x-transition class="absolute top-28 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-4 py-2 rounded-full shadow-lg z-50 whitespace-nowrap" x-text="toast"></div>
+
+    <!-- Bottom navigation -->
+    <nav class="absolute bottom-0 inset-x-0 bg-white border-t border-gray-200 grid grid-cols-4 z-40" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
+      <template x-for="n in navs" :key="n.id">
+        <button @click="tab = n.id; $refs.main.scrollTop = 0" class="py-2 flex flex-col items-center gap-0.5 text-[11px]" :class="tab === n.id ? 'text-grab font-bold' : 'text-gray-500'">
+          <span class="text-lg leading-none" x-text="n.icon"></span>
+          <span x-text="n.label"></span>
+        </button>
+      </template>
+    </nav>
+
+  </div>
+</div>
+</body>
+</html>
